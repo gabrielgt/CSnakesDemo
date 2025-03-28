@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Numerics.Tensors;
 
 IPythonEnvironment GetEnvironment(string[] strings, string pythonsrc)
 {
@@ -15,8 +16,8 @@ IPythonEnvironment GetEnvironment(string[] strings, string pythonsrc)
                 .WithPython()
                 .WithHome(home)
                 .WithVirtualEnvironment(venv)
-                .FromNuGet("3.12.4")
-                .WithPipInstaller();
+                .FromRedistributable("3.12")
+                .WithUvInstaller();
         });
 
     var app = builder.Build();
@@ -24,56 +25,38 @@ IPythonEnvironment GetEnvironment(string[] strings, string pythonsrc)
     return env;
 }
 
-void RunModule1(IMain module)
+void RunModule(IMainModule module)
 {
     Console.WriteLine($"Invocando a Python desde C# ({DateTime.Now.TimeOfDay})");
     module.Start();
 
-    var tensor = module.PytorchDemo().AsTensorSpan<float>();
+    var tensor = module.Demo(size: 2000).AsTensorSpan<double>();
     Console.WriteLine("Accediendo al tensor compartido por Python desde C#:");
+    PrintTensor(tensor);
+
+    module.Stop();
+}
+
+void PrintTensor(TensorSpan<double> tensorSpan)
+{
     for (var i=0; i < 5; i++)
     {
         Console.Write("        ");
         for (var j=0; j < 5; j++)
         {
-            Console.Write($"{tensor[i, j]:F4}  ");
+            Console.Write($"{tensorSpan[i, j]:F4}  ");
         }
 
         Console.WriteLine();
     }
-    Console.WriteLine();
 
-    module.Stop();
+    Console.WriteLine();
 }
 
-void RunModule2(IMain2 module)
-{
-    Console.WriteLine($"Invocando a Python desde C# ({DateTime.Now.TimeOfDay})");
-    module.Start();
-
-    var tensor = module.PytorchDemo().AsTensorSpan<float>();
-    Console.WriteLine("Accediendo al tensor compartido por Python desde C#:");
-    for (var i = 0; i < 5; i++)
-    {
-        Console.Write("        ");
-        for (var j = 0; j < 5; j++)
-        {
-            Console.Write($"{tensor[i, j]:F4}  ");
-        }
-
-        Console.WriteLine();
-    }
-    Console.WriteLine();
-
-    module.Stop();
-}
 
 Console.WriteLine($"Arrancando C# ({DateTime.Now.TimeOfDay})");
 
-var module1 = GetEnvironment(args, "pythonsrc").Main();
-RunModule1(module1);
-
-//var module2 = GetEnvironment(args, "pythonsrc2").Main2();
-//RunModule2(module2);
+var module = GetEnvironment(args, "pythonsrc").MainModule();
+RunModule(module);
 
 Console.WriteLine($"Fin de C# ({DateTime.Now.TimeOfDay})");
