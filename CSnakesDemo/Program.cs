@@ -2,10 +2,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Reflection;
 
-IPythonEnvironment GetEnvironment(string[] strings, string pythonsrc)
+IPythonEnvironment GetEnvironment(string[] args, string pythonsrc)
 {
-    var builder = Host.CreateDefaultBuilder(strings)
+    var builder = Host.CreateDefaultBuilder(args)
         .ConfigureServices(services =>
         {
             var home = Path.Join(Environment.CurrentDirectory, pythonsrc);
@@ -22,6 +23,21 @@ IPythonEnvironment GetEnvironment(string[] strings, string pythonsrc)
     var app = builder.Build();
     var env = app.Services.GetRequiredService<IPythonEnvironment>();
     return env;
+}
+
+void DisposePythonEnvironment()
+{
+    var assembly = Assembly.GetAssembly(typeof(PythonEnvironmentOptions));
+    var internalClassType = assembly.GetType("CSnakes.Runtime.PythonEnvironment");
+    var field = internalClassType.GetField(
+        "pythonEnvironment",
+        BindingFlags.NonPublic | BindingFlags.Static
+    );
+    var fieldValue = field.GetValue(null);
+    if (fieldValue != null)
+    {
+        field.SetValue(null, null);
+    }
 }
 
 void RunModule1(IMain module)
@@ -70,10 +86,15 @@ void RunModule2(IMain2 module)
 
 Console.WriteLine($"Arrancando C# ({DateTime.Now.TimeOfDay})");
 
-var module1 = GetEnvironment(args, "pythonsrc").Main();
+var pythonEnvironment1 = GetEnvironment(args, "pythonsrc");
+var module1 = pythonEnvironment1.Main();
 RunModule1(module1);
 
-//var module2 = GetEnvironment(args, "pythonsrc2").Main2();
-//RunModule2(module2);
+pythonEnvironment1.Dispose();
+//DisposePythonEnvironment();
+
+var pythonEnvironment2 = GetEnvironment(args, "pythonsrc2");
+var module2 = pythonEnvironment2.Main2();
+RunModule2(module2);
 
 Console.WriteLine($"Fin de C# ({DateTime.Now.TimeOfDay})");
